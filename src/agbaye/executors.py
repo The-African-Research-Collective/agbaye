@@ -1,6 +1,7 @@
 from typing import Any
 
-from datatrove.executor.slurm import SlurmPipelineExecutor
+from datatrove.executor.base import PipelineExecutor
+from datatrove.executor.local import LocalPipelineExecutor
 from datatrove.io import DataFolderLike
 from datatrove.pipeline.extractors import Trafilatura
 from datatrove.pipeline.filters import (
@@ -21,9 +22,10 @@ def get_common_crawl_executor(
     lid_backend: str = "afrolid",
     lid_batch_size: int = 1,
     lid_keep_top_pairs_threshold: float = -1,
-    **slurm_args: Any
-) -> SlurmPipelineExecutor:
-    executor = SlurmPipelineExecutor(
+    executor_class: PipelineExecutor = LocalPipelineExecutor,
+    **kwargs: Any
+) -> PipelineExecutor:
+    executor = executor_class(
         job_name=f"cc_{dump_name}",
         pipeline=[
             WarcReader(
@@ -44,7 +46,7 @@ def get_common_crawl_executor(
             # GopherQualityFilter(exclusion_writer=JsonlWriter(f"{output_path}/removed/quality/{dump_name}")),
             JsonlWriter(f"{output_path}/output/{dump_name}")
         ]
-        **slurm_args
+        **kwargs
     )
 
     return executor

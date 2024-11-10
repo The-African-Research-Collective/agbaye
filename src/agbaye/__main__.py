@@ -17,12 +17,13 @@ def main():
         output_path = DataFolder(main_args.output_path, fs)
 
     executor = get_common_crawl_executor(
+        executor_class=main_args.executor_class,
         dump_name=main_args.dump_name,
         output_path=output_path,
         lid_backend=lid_args.lid_backend,
         lid_batch_size=lid_args.lid_batch_size,
         lid_keep_top_pairs_threshold=lid_args.lid_keep_top_pairs_threshold,
-        **vars(slurm_args)
+        **(vars(slurm_args) if main_args.executor_class == "slurm" else {})
     )
 
     executor.run()
