@@ -1,3 +1,5 @@
+import os
+
 from dataclasses import dataclass, field
 from typing import Literal, Optional
 
@@ -14,6 +16,13 @@ class ADLFSArgs:
     use_adlfs: bool = False
     account_name: Optional[str] = None
     account_key: Optional[str] = None
+
+    def __post_init__(self):
+        if self.use_adlfs:
+            assert self.account_name is not None, "account_name is required when use_adlfs is True"
+
+            self.account_key = self.account_key or os.getenv("AZURE_STORAGE_KEY")
+            assert self.account_key is not None, "account_key is required when use_adlfs is True"
 
 
 @dataclass
