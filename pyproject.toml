@@ -9,12 +9,16 @@ readme = "README.md"
 python = "^3.11"
 datatrove = {extras = ["cli", "io", "processing"], version = "^0.3.0"}
 afrolid = {git = "https://github.com/theyorubayesian/afrolid.git"}
+adlfs = "^2024.7.0"
+transformers = {extras = ["torch"], version = "^4.46.2"}
+sentencepiece = "^0.2.0"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"
-transformers = {extras = ["torch"], version = "^4.46.2"}
-sentencepiece = "^0.2.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+agbaye = "agbaye.__main__:main"
