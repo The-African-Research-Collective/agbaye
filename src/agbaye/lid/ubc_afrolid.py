@@ -1,3 +1,4 @@
+import torch
 from datatrove.data import Document
 from datatrove.utils.lid import LID
 
@@ -5,12 +6,15 @@ from afrolid import load_afrolid_artifacts, predict_language, LanguageInfo
 
 
 class AfroLID(LID):
-    def __init__(self, n_predictions: int = 3):
+    def __init__(self, n_predictions: int = 3, device: str | torch.device = torch.device("cpu")):
         self.load_artifacts()
         self.n_predictions = n_predictions
+        self.device = device
+        self._model = self._model.to(self.device)
     
     def load_artifacts(self):
         self._model, self._tokenizer, self._languages = load_afrolid_artifacts()
+        
     
     @property
     def languages(self):
@@ -33,6 +37,7 @@ class AfroLID(LID):
             tokenizer=self.tokenizer, 
             languages=self.languages,
             top_k=self.n_predictions,
+            device=self.device,
             pad_to_multiple_of=8
         )
         return predictions
