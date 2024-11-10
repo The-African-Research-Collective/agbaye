@@ -1,5 +1,6 @@
 from typing import Literal
 
+import torch
 from datatrove.data import Document
 from datatrove.pipeline.filters.base_filter import BaseFilter
 from datatrove.pipeline.writers.disk_base import DiskWriter
@@ -19,6 +20,7 @@ class AfricanLanguageFilter(BaseFilter):
         keep_top_predictions_threshold: float = -1,
         batch_size: int = 1,
         exclusion_writer: DiskWriter = None,
+        device: str | torch.device = "cpu",
     ):
         super().__init__(exclusion_writer, batch_size=batch_size)
 
@@ -28,9 +30,10 @@ class AfricanLanguageFilter(BaseFilter):
 
         if isinstance(languages, str):
             languages = list(languages)
-        self.languages = set(languages)
+        
+        self.languages = set(languages) if languages else languages
 
-        self.model = self.backend_map[backend](n_predictions=5)
+        self.model = self.backend_map[backend](n_predictions=5, device=device)
 
     def filter(self, doc: Document) -> bool:
         """Args:
