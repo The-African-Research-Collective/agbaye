@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "agbaye"
+version = "0.1.0"
+description = "Preprocessing Common Crawl for African Text"
+authors = ["theyorubayesian <akin.o.oladipo@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+datatrove = {extras = ["cli", "io", "processing"], version = "^0.3.0"}
+afrolid = {git = "https://github.com/theyorubayesian/afrolid.git"}
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
+transformers = {extras = ["torch"], version = "^4.46.2"}
+sentencepiece = "^0.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
