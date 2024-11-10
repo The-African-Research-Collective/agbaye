@@ -1,5 +1,4 @@
-from dataclasses import dataclass, asdict
-from typing import Optional
+from typing import Any
 
 from datatrove.executor.slurm import SlurmPipelineExecutor
 from datatrove.io import DataFolderLike
@@ -15,28 +14,15 @@ from datatrove.pipeline.writers import JsonlWriter
 from .lid import AfricanLanguageFilter
 
 
-@dataclass
-class SlurmArgs:
-    tasks: int
-    slurm_logs_folder: str
-    time: str = "24:00:00"
-    partition: Optional[str] = None
-    mail_user: Optional[str] = None
-    mem_per_cpu_gb: int = 2
-    randomize_start_durations: int = 180
-    sbatch_args: Optional[dict] = None
-    srun_args: Optional[dict] = None
-
-
 def get_common_crawl_executor(
     dump_name: str,
     output_path: DataFolderLike,
-    slurm_args: SlurmArgs,
     language_threshold: float = 0.65,
     lid_backend: str = "afrolid",
     lid_batch_size: int = 1,
     lid_keep_top_pairs_threshold: float = -1,
-) -> None:
+    **slurm_args: Any
+) -> SlurmPipelineExecutor:
     executor = SlurmPipelineExecutor(
         job_name=f"cc_{dump_name}",
         pipeline=[
@@ -54,10 +40,11 @@ def get_common_crawl_executor(
                 keep_top_pairs_threshold=lid_keep_top_pairs_threshold
             ),
             GopherRepetitionFilter(exclusion_writer=JsonlWriter(f"{output_path}/removed/repetitive/{dump_name}")),
-            GopherQualityFilter(exclusion_writer=JsonlWriter(f"{output_path}/removed/quality/{dump_name}")),
+            # TODO: @theyorubayesian - GopherQualityFilter requires language specific information for tokenization
+            # GopherQualityFilter(exclusion_writer=JsonlWriter(f"{output_path}/removed/quality/{dump_name}")),
             JsonlWriter(f"{output_path}/output/{dump_name}")
         ]
-        **asdict(slurm_args)
+        **slurm_args
     )
 
-    executor.run()
+    return executor
