@@ -1,3 +1,6 @@
+import os
+import sys
+
 from transformers import HfArgumentParser
 
 from .arguments import ADLFSArgs, LIDArgs, SlurmArgs
@@ -6,7 +9,10 @@ from .executors import get_common_crawl_executor
 
 def main():
     parser = HfArgumentParser((ADLFSArgs, LIDArgs, SlurmArgs))
-    main_args, adlfs_args, lid_args, slurm_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        main_args, adlfs_args, lid_args, slurm_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        main_args, adlfs_args, lid_args, slurm_args = parser.parse_args_into_dataclasses()
 
     output_path = main_args.output_path
     if adlfs_args.use_adlfs:
