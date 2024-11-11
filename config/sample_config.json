@@ -1,0 +1,10 @@
+{
+    "dump_name": "CC-MAIN-2014-10",
+    "output_path": "common_crawl/CC-MAIN-2014-10",
+    "use_adlfs": true,
+    "account_name": "taresco",
+    "tasks": 400,
+    "threshold": 0.65,
+    "lid_batch_size": 2,
+    "device": "cpu"
+}

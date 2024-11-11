@@ -17,7 +17,6 @@ from fsspec import AbstractFileSystem
 from .lid import AfricanLanguageFilter
 
 
-# TODO: @theyorubayesian - Use DataFolder in f-strings yields unwanted behavior
 def get_common_crawl_executor(
     dump_name: str,
     output_path: str,
