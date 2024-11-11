@@ -1,9 +1,9 @@
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 import torch
 from datatrove.executor.base import PipelineExecutor
 from datatrove.executor import LocalPipelineExecutor
-from datatrove.io import DataFolderLike
+from datatrove.io import get_datafolder
 from datatrove.pipeline.extractors import Trafilatura
 from datatrove.pipeline.filters import (
     GopherQualityFilter,
@@ -12,6 +12,7 @@ from datatrove.pipeline.filters import (
 )
 from datatrove.pipeline.readers import WarcReader
 from datatrove.pipeline.writers import JsonlWriter
+from fsspec import AbstractFileSystem
 
 from .lid import AfricanLanguageFilter
 
@@ -19,13 +20,14 @@ from .lid import AfricanLanguageFilter
 # TODO: @theyorubayesian - Use DataFolder in f-strings yields unwanted behavior
 def get_common_crawl_executor(
     dump_name: str,
-    output_path: DataFolderLike,
+    output_path: str,
     language_threshold: float = 0.65,
     lid_backend: str = "afrolid",
     lid_batch_size: int = 1,
     lid_keep_top_predictions_threshold: float = -1,
     lid_device: str | torch.device = "cpu",
     executor_class: PipelineExecutor = LocalPipelineExecutor,
+    fs: AbstractFileSystem | None = None,
     **kwargs: Any
 ) -> PipelineExecutor:
     executor = executor_class(
@@ -35,7 +37,7 @@ def get_common_crawl_executor(
                 glob_pattern="*/warc/*",
                 default_metadata={"dump_name": dump_name},
             ),
-            URLFilter(exclusion_writer=JsonlWriter(f"{output_path}/removed/url/{dump_name}")),
+            URLFilter(exclusion_writer=JsonlWriter(get_datafolder((f"{output_path}/removed/url/{dump_name}", fs)))),
             Trafilatura(favour_precision=True, timeout=1.0),
             AfricanLanguageFilter(
                 backend=lid_backend,
@@ -47,7 +49,7 @@ def get_common_crawl_executor(
             # TODO: @theyorubayesian - Gopher Filters requires language specific information for tokenization
             # GopherRepetitionFilter(exclusion_writer=JsonlWriter(f"{output_path}/removed/repetitive/{dump_name}")),
             # GopherQualityFilter(exclusion_writer=JsonlWriter(f"{output_path}/removed/quality/{dump_name}")),
-            JsonlWriter(f"{output_path}/output/{dump_name}")
+            JsonlWriter(get_datafolder((f"{output_path}/output/{dump_name}", fs)))
         ],
         **kwargs
     )

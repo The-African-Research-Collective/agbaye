@@ -17,23 +17,26 @@ def main():
     if main_args.executor_class.__name__ == "SlurmPipelineExecutor":
         assert slurm_args.job_name is not None, "job_name is required when executor_class is SlurmPipelineExecutor"
 
-    output_path = main_args.output_path
+    fs = None
     if adlfs_args.use_adlfs:
         from adlfs import AzureBlobFileSystem
-        from datatrove.io import DataFolder
 
         fs = AzureBlobFileSystem(account_name=adlfs_args.account_name)
-        output_path = DataFolder(main_args.output_path, fs)
 
     executor = get_common_crawl_executor(
         executor_class=main_args.executor_class,
         dump_name=main_args.dump_name,
-        output_path=output_path,
+        output_path=main_args.output_path,
         language_threshold=lid_args.threshold,
         lid_backend=lid_args.lid_backend,
         lid_batch_size=lid_args.lid_batch_size,
         lid_keep_top_predictions_threshold=lid_args.lid_keep_top_predictions_threshold,
+        fs=fs,
         **(vars(slurm_args) if main_args.executor_class == "slurm" else {})
     )
 
     executor.run()
+
+
+if __name__ == "__main__":
+    main()
