@@ -2,15 +2,17 @@ from typing import Literal
 
 import torch
 from datatrove.data import Document
+from datatrove.pipeline.filters import LanguageFilter
 from datatrove.pipeline.filters.base_filter import BaseFilter
 from datatrove.pipeline.writers.disk_base import DiskWriter
 
+from .openlid import OpenLID
 from .ubc_afrolid import AfroLID
 
 
 class AfricanLanguageFilter(BaseFilter):
     name = "african_language_filter"
-    backend_map = {"afrolid": AfroLID}
+    backend_map = {"afrolid": AfroLID, "openlid": OpenLID}
 
     def __init__(
         self,
@@ -32,8 +34,11 @@ class AfricanLanguageFilter(BaseFilter):
             languages = list(languages)
         
         self.languages = set(languages) if languages else languages
-
         self.model = self.backend_map[backend](n_predictions=5, device=device)
+
+        if self.languages is None and hasattr(self.model, "languages"):
+            # Use African languages supported by the model
+            self.languages = self.model.languages
 
     def filter(self, doc: Document) -> bool:
         """Args:

@@ -1,3 +1,5 @@
+from typing import overload
+
 import torch
 from datatrove.data import Document
 from datatrove.utils.lid import LID
@@ -14,7 +16,6 @@ class AfroLID(LID):
     
     def load_artifacts(self):
         self._model, self._tokenizer, self._languages = load_afrolid_artifacts()
-        
     
     @property
     def languages(self):
@@ -28,7 +29,13 @@ class AfroLID(LID):
     def tokenizer(self):
         return self._tokenizer
     
-    def predict(self, doc: Document | list[Document]) -> list[list[LanguageInfo]]:
+    @overload
+    def predict(self, doc: Document) -> list[LanguageInfo]: ...
+
+    @overload
+    def predict(self, doc: list[Document]) -> list[list[LanguageInfo]]: ...
+    
+    def predict(self, doc: Document | list[Document]) -> list[LanguageInfo] | list[list[LanguageInfo]]:
         model_input = [d.text for d in doc] if isinstance(doc, list) else doc.text
         
         predictions = predict_language(

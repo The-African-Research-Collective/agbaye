@@ -30,6 +30,7 @@ def main():
         language_threshold=lid_args.threshold,
         lid_backend=lid_args.lid_backend,
         lid_batch_size=lid_args.lid_batch_size,
+        lid_device=lid_args.device,
         lid_keep_top_predictions_threshold=lid_args.lid_keep_top_predictions_threshold,
         fs=fs,
         **(vars(slurm_args) if main_args.executor_class == "slurm" else {})
