@@ -3,7 +3,7 @@ from typing import Any
 import torch
 from datatrove.executor.base import PipelineExecutor
 from datatrove.executor import LocalPipelineExecutor
-from datatrove.io import get_datafolder
+from datatrove.io import get_datafolder, DataFolder
 from datatrove.pipeline.extractors import Trafilatura
 from datatrove.pipeline.filters import (
     GopherQualityFilter,
@@ -15,6 +15,12 @@ from datatrove.pipeline.writers import JsonlWriter
 from fsspec import AbstractFileSystem
 
 from .lid import AfricanLanguageFilter
+
+
+def _get_datafolder(output_path: str, fs: AbstractFileSystem | None = None) ->  DataFolder:
+    if fs is None:
+        return get_datafolder(output_path)
+    return get_datafolder((output_path, fs))
 
 
 def get_common_crawl_executor(
@@ -36,7 +42,7 @@ def get_common_crawl_executor(
                 glob_pattern="*/warc/*",
                 default_metadata={"dump_name": dump_name},
             ),
-            URLFilter(exclusion_writer=JsonlWriter(get_datafolder((f"{output_path}/removed/url/{dump_name}", fs)))),
+            URLFilter(),
             Trafilatura(favour_precision=True, timeout=1.0),
             AfricanLanguageFilter(
                 backend=lid_backend,
@@ -45,10 +51,12 @@ def get_common_crawl_executor(
                 keep_top_predictions_threshold=lid_keep_top_predictions_threshold,
                 device=lid_device
             ),
+
             # TODO: @theyorubayesian - Gopher Filters requires language specific information for tokenization
             # GopherRepetitionFilter(exclusion_writer=JsonlWriter(f"{output_path}/removed/repetitive/{dump_name}")),
             # GopherQualityFilter(exclusion_writer=JsonlWriter(f"{output_path}/removed/quality/{dump_name}")),
-            JsonlWriter(get_datafolder((f"{output_path}/output/{dump_name}", fs)))
+
+            JsonlWriter(_get_datafolder(f"{output_path}/output/{dump_name}", fs))
         ],
         **kwargs
     )
