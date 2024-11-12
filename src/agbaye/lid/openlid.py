@@ -47,12 +47,9 @@ class OpenLID(LID):
 
             def decompress():
                 output_path = model_file.rstrip('.gz')
-
-                if not os.path.exists(model_file):
-                    # Decompress the file
-                    with gzip.open(model_file, 'rb') as f_in:
-                        with open(output_path, 'wb') as f_out:
-                            shutil.copyfileobj(f_in, f_out)
+                with gzip.open(model_file, 'rb') as f_in:
+                    with open(output_path, 'wb') as f_out:
+                        shutil.copyfileobj(f_in, f_out)
 
             safely_create_file(model_file.rstrip(".gz"), decompress)
             self._model = _FastText(model_file.rstrip(".gz"))
