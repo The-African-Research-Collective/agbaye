@@ -9,7 +9,10 @@ import datatrove.executor
 class MainArgs:
     dump_name: str
     output_path: str
+    skip_warc_rows: int = 0
+    logging_dir: Optional[str] = None
     executor_class: Literal["local", "slurm"] = "local"
+    randomize_start_duration: int = 180
 
     def __post_init__(self):
         self.executor_class = getattr(datatrove.executor, f"{self.executor_class.capitalize()}PipelineExecutor")
@@ -43,7 +46,6 @@ class SlurmArgs:
     mail_user: Optional[str] = None
     cpus_per_task: int = 1,
     mem_per_cpu_gb: int = 2
-    randomize_start_durations: int = 180
     sbatch_args: Optional[dict | str] = None
     srun_args: Optional[dict | str] = None
 

@@ -26,6 +26,9 @@ def _get_datafolder(output_path: str, fs: AbstractFileSystem | None = None) ->  
 def get_common_crawl_executor(
     dump_name: str,
     output_path: str,
+    skip_warc_rows: int = 0,
+    randomize_start_duration: int = 0,
+    logging_dir: str | None = None,
     language_threshold: float = 0.65,
     lid_backend: str = "afrolid",
     lid_batch_size: int = 1,
@@ -41,6 +44,7 @@ def get_common_crawl_executor(
                 f"s3://commoncrawl/crawl-data/{dump_name}/segments",
                 glob_pattern="*/warc/*",
                 default_metadata={"dump_name": dump_name},
+                skip=skip_warc_rows
             ),
             URLFilter(),
             Trafilatura(favour_precision=True, timeout=1.0),
@@ -58,6 +62,8 @@ def get_common_crawl_executor(
 
             JsonlWriter(_get_datafolder(f"{output_path}/output/{dump_name}", fs))
         ],
+        randomize_start_duration=randomize_start_duration,
+        logging_dir=logging_dir,
         **kwargs
     )
 
