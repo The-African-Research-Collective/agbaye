@@ -8,14 +8,15 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.11"
 datatrove = {extras = ["cli", "io", "processing", "s3"], version = "^0.3.0"}
-afrolid = {git = "https://github.com/theyorubayesian/afrolid.git"}
 adlfs = "^2024.7.0"
-transformers = {extras = ["torch"], version = "^4.46.2"}
-sentencepiece = "^0.2.0"
 python-dotenv = "^1.0.1"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"
+
+[tool.poetry.group.afrolid.dependencies]
+afrolid = {git = "https://github.com/theyorubayesian/afrolid.git"}
+sentencepiece = "^0.2.0"
 
 [build-system]
 requires = ["poetry-core"]

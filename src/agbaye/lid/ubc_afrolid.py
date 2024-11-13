@@ -1,21 +1,29 @@
-from typing import overload
+from typing import Final, overload
 
-import torch
 from datatrove.data import Document
 from datatrove.utils.lid import LID
-
-from afrolid import load_afrolid_artifacts, predict_language, LanguageInfo
+from datatrove.utils._import_utils import check_required_dependencies
 
 
 class AfroLID(LID):
-    def __init__(self, n_predictions: int = 3, device: str | torch.device = torch.device("cpu")):
-        self.load_artifacts()
-        self.n_predictions = n_predictions
-        self.device = device
-        self._model = self._model.to(self.device)
-    
-    def load_artifacts(self):
+    def __init__(self, n_predictions: int = 3, languages: list[str] = None, device: str | None = None):
+        check_required_dependencies("afrolid", ["torch", "transformers"])
+
+        import torch
+
+        from afrolid import load_afrolid_artifacts, predict_language, LanguageInfo
+        from afrolid.language_info import Language
+
+        AfroLIDLanguages: Final[frozenset[str]] = frozenset((map(lambda language: language.value["name"], Language)))
+        if languages is not None:
+            assert AfroLIDLanguages.issuperset(languages)
+        
         self._model, self._tokenizer, self._languages = load_afrolid_artifacts()
+        self.languages = languages or AfroLIDLanguages
+
+        self.n_predictions = n_predictions
+        self.device = device or torch.device("cpu")
+        self._model = self._model.to(self.device)
     
     @property
     def languages(self):
