@@ -2,8 +2,8 @@ from typing import Literal
 
 import torch
 from datatrove.data import Document
-from datatrove.pipeline.filters import LanguageFilter
 from datatrove.pipeline.filters.base_filter import BaseFilter
+from datatrove.utils.lid import LID
 from datatrove.pipeline.writers.disk_base import DiskWriter
 
 from .openlid import OpenLID
@@ -12,7 +12,7 @@ from .ubc_afrolid import AfroLID
 
 class AfricanLanguageFilter(BaseFilter):
     name = "african_language_filter"
-    backend_map = {"afrolid": AfroLID, "openlid": OpenLID}
+    backend_map: dict[str, type[LID]] = {"afrolid": AfroLID, "openlid": OpenLID}
 
     def __init__(
         self,
@@ -57,7 +57,7 @@ class AfricanLanguageFilter(BaseFilter):
             doc.metadata["language_score"] = predictions[0]["probability"]
 
             if self.keep_top_predictions_threshold != -1:
-                doc.metadata["top_language_pairs"] = [l for l in predictions if l["probability"] > self.keep_top_pairs_threshold]
+                doc.metadata["top_language_pairs"] = [l for l in predictions if l["probability"] > self.keep_top_predictions_threshold]
             return True
         else:
             return False
@@ -78,7 +78,7 @@ class AfricanLanguageFilter(BaseFilter):
                 batch[idx].metadata["language_score"] = item[0]["probability"]
 
                 if self.keep_top_predictions_threshold != -1:
-                    batch[idx].metadata["top_language_pairs"] = [l for l in item if l["probability"] > self.keep_top_pairs_threshold]
+                    batch[idx].metadata["top_language_pairs"] = [l for l in item if l["probability"] > self.keep_top_predictions_threshold]
                 batch_results.append(True)
             else:
                 batch_results.append(False)            

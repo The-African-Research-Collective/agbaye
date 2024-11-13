@@ -44,7 +44,8 @@ def get_common_crawl_executor(
                 f"s3://commoncrawl/crawl-data/{dump_name}/segments",
                 glob_pattern="*/warc/*",
                 default_metadata={"dump_name": dump_name},
-                skip=skip_warc_rows
+                skip=skip_warc_rows,
+                shuffle_files=True
             ),
             URLFilter(),
             Trafilatura(favour_precision=True, timeout=1.0),
@@ -64,6 +65,7 @@ def get_common_crawl_executor(
         ],
         randomize_start_duration=randomize_start_duration,
         logging_dir=logging_dir,
+        workers=4,
         **kwargs
     )
 
