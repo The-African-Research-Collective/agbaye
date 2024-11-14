@@ -1,10 +1,9 @@
 import os
 import sys
 
-from transformers import HfArgumentParser
-
 from .arguments import ADLFSArgs, LIDArgs, MainArgs, SlurmArgs
 from .executors import get_common_crawl_executor
+from .hf_parser import HfArgumentParser
 
 
 def main():

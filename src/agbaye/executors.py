@@ -1,6 +1,5 @@
 from typing import Any
 
-import torch
 from datatrove.executor.base import PipelineExecutor
 from datatrove.executor import LocalPipelineExecutor
 from datatrove.io import get_datafolder, DataFolder
@@ -14,7 +13,7 @@ from datatrove.pipeline.readers import WarcReader
 from datatrove.pipeline.writers import JsonlWriter
 from fsspec import AbstractFileSystem
 
-from .lid import AfricanLanguageFilter
+from .lid import AfricanLanguageFilter, TorchDevice
 
 
 def _get_datafolder(output_path: str, fs: AbstractFileSystem | None = None) ->  DataFolder:
@@ -33,7 +32,7 @@ def get_common_crawl_executor(
     lid_backend: str = "afrolid",
     lid_batch_size: int = 1,
     lid_keep_top_predictions_threshold: float = -1,
-    lid_device: str | torch.device = "cpu",
+    lid_device: str | TorchDevice = "cpu",
     executor_class: PipelineExecutor = LocalPipelineExecutor,
     fs: AbstractFileSystem | None = None,
     **kwargs: Any
@@ -48,7 +47,7 @@ def get_common_crawl_executor(
                 shuffle_files=True
             ),
             URLFilter(),
-            Trafilatura(favour_precision=True, timeout=1.0),
+            Trafilatura(favour_precision=True, timeout=3.0),
             AfricanLanguageFilter(
                 backend=lid_backend,
                 batch_size=lid_batch_size,
