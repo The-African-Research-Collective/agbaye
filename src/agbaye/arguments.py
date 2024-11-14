@@ -32,7 +32,7 @@ class ADLFSArgs:
 
             assert self.account_name is not None, "account_name is required when use_adlfs is True"
 
-            self.account_key = self.account_key or os.getenv("AZURE_STORAGE_KEY")
+            self.account_key = self.account_key or os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
             assert self.account_key is not None, "account_key is required when use_adlfs is True"
 
 
