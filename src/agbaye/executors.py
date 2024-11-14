@@ -64,7 +64,6 @@ def get_common_crawl_executor(
         ],
         randomize_start_duration=randomize_start_duration,
         logging_dir=logging_dir,
-        workers=4,
         **kwargs
     )
 

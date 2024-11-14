@@ -35,7 +35,7 @@ def main():
         lid_device=lid_args.device,
         lid_keep_top_predictions_threshold=lid_args.lid_keep_top_predictions_threshold,
         fs=fs,
-        **(vars(slurm_args) if main_args.executor_class == "slurm" else {})
+        **(vars(slurm_args) if main_args.executor_class.__name__ == "SlurmPipelineExecutor" else {})
     )
 
     executor.run()

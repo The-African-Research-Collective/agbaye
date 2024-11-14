@@ -42,7 +42,7 @@ class SlurmArgs:
     tasks: int = 1
     slurm_logs_folder: str = "slurm_logs"
     time: str = "24:00:00"
-    partition: Optional[str] = None
+    partition: str = "default"
     mail_user: Optional[str] = None
     cpus_per_task: int = 1,
     mem_per_cpu_gb: int = 2
