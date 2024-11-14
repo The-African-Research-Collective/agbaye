@@ -12,7 +12,9 @@ class AfroLID(LID):
         self._languages = languages
         self.n_predictions = n_predictions
         self.device = device
+        self._model = None
 
+        # this sets self.predict_language which is called before self.model in self.predict
         assert self.model
     
     @property
@@ -21,25 +23,26 @@ class AfroLID(LID):
     
     @property
     def model(self):
-        check_required_dependencies("afrolid", ["torch", "transformers"])
+        if self._model is None:
+            check_required_dependencies("afrolid", ["torch", "transformers"])
 
-        import torch
+            import torch
 
-        from afrolid import load_afrolid_artifacts, predict_language
-        from afrolid.language_info import Language
+            from afrolid import load_afrolid_artifacts, predict_language
+            from afrolid.language_info import Language
 
-        AfroLIDLanguages: Final[frozenset[str]] = frozenset((map(lambda language: language.value["name"], Language)))
-        
-        if self._languages is not None:
-            assert AfroLIDLanguages.issuperset(self._languages)
-        else:
-            self._languages = AfroLIDLanguages
-        
-        self._model, self._tokenizer, self._supported_languages = load_afrolid_artifacts()
-        self.device = self.device or torch.device("cpu")
-        self._model = self._model.to(self.device)
+            AfroLIDLanguages: Final[frozenset[str]] = frozenset((map(lambda language: language.value["name"], Language)))
+            
+            if self._languages is not None:
+                assert AfroLIDLanguages.issuperset(self._languages)
+            else:
+                self._languages = AfroLIDLanguages
+            
+            self._model, self._tokenizer, self._supported_languages = load_afrolid_artifacts()
+            self.device = self.device or torch.device("cpu")
+            self._model = self._model.to(self.device)
 
-        self.predict_language = predict_language
+            self.predict_language = predict_language
         return self._model
     
     @property
