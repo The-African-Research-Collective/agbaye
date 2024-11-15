@@ -5,6 +5,7 @@ from datatrove.executor import LocalPipelineExecutor
 from datatrove.io import get_datafolder, DataFolder
 from datatrove.pipeline.extractors import Trafilatura
 from datatrove.pipeline.filters import (
+    C4ParagraphFilter,
     GopherQualityFilter,
     GopherRepetitionFilter,
     URLFilter
@@ -48,6 +49,8 @@ def get_common_crawl_executor(
             ),
             URLFilter(),
             Trafilatura(favour_precision=True, timeout=3.0),
+            C4ParagraphFilter(),
+            # IsNotEnglishFilter?
             AfricanLanguageFilter(
                 backend=lid_backend,
                 batch_size=lid_batch_size,

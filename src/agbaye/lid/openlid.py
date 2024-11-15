@@ -1,5 +1,5 @@
 import gzip
-import os
+import re
 import shutil
 from typing import Final, TypeAlias
 
@@ -55,13 +55,21 @@ class OpenLID(LID):
             self._model = _FastText(model_file.rstrip(".gz"))
         return self._model
     
+    @staticmethod
+    def clean_text(text: str) -> str:
+        return re.sub(
+            r'\s+', ' ', text.replace("\n", " ").\
+                replace("|", " ").replace("--", "")).\
+                replace('=', '').replace("- -", "").\
+                replace("#", "").replace("*", "")
+    
     def predict(self, doc: Document | list[Document]) -> list[LanguageInfo] | list[list[LanguageInfo]]:
         if isinstance(doc, Document):
             doc = [doc]
         
         results = []
         for item in doc:
-            langs, scores = self.model.predict(item.text.replace("\n", " "), k=self.n_predictions)
+            langs, scores = self.model.predict(self.clean_text(item.text), k=self.n_predictions)
 
             predictions = [
                 {
