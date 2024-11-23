@@ -27,6 +27,8 @@ def main():
         dump_name=main_args.dump_name,
         logging_dir=main_args.logging_dir,
         skip_warc_rows=main_args.skip_warc_rows,
+        limit=main_args.limit,
+        shuffle=main_args.shuffle,
         randomize_start_duration=main_args.randomize_start_duration,
         output_path=main_args.output_path,
         language_threshold=lid_args.threshold,

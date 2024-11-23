@@ -25,6 +25,8 @@ class OpenLID(LID):
         "tso_Latn", "twi_Latn", "umb_Latn", "wol_Latn", "xho_Latn",
         "yor_Latn", "zul_Latn"
     ])
+    
+    WHITESPACE_REGEX = re.compile(r'\s+')
 
     def __init__(self, languages: list[str] | None = None, n_predictions: int = -1, **kwargs) -> None:
         assert languages is None or self.LANGUAGES.issuperset(languages), f"Languages must be subset of {self.LANGUAGES}"
@@ -32,53 +34,53 @@ class OpenLID(LID):
         self.n_predictions = n_predictions
         self._model = None
     
+    def _initialize_model(self) -> None:
+        check_required_dependencies("lid", [("fasttext", "fasttext-wheel")])
+        from fasttext.FastText import _FastText
+
+        model_file = cached_asset_path_or_download(
+            self.MODEL_URL,
+            namespace="lid",
+            subfolder=self.MODEL_SUBFOLDER,
+            desc="fast-text language identifier model",
+        )
+
+        output_path = model_file.rstrip('.gz')
+
+        def decompress():
+            with gzip.open(model_file, 'rb') as f_in:
+                with open(output_path, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+
+        safely_create_file(output_path, decompress)
+        self._model = _FastText(output_path)
+    
     @property
     def model(self):
         if self._model is None:
-            check_required_dependencies("lid", [("fasttext", "fasttext-wheel")])
-            from fasttext.FastText import _FastText
- 
-            model_file = cached_asset_path_or_download(
-                self.MODEL_URL,
-                namespace="lid",
-                subfolder=self.MODEL_SUBFOLDER,
-                desc="fast-text language identifier model",
-            )
-
-            def decompress():
-                output_path = model_file.rstrip('.gz')
-                with gzip.open(model_file, 'rb') as f_in:
-                    with open(output_path, 'wb') as f_out:
-                        shutil.copyfileobj(f_in, f_out)
-
-            safely_create_file(model_file.rstrip(".gz"), decompress)
-            self._model = _FastText(model_file.rstrip(".gz"))
+            self._initialize_model()
         return self._model
     
     @staticmethod
     def clean_text(text: str) -> str:
-        return re.sub(
-            r'\s+', ' ', text.replace("\n", " ").\
-                replace("|", " ").replace("--", "")).\
+        return OpenLID.WHITESPACE_REGEX.sub(' ', text.replace("\n", " ").\
+                replace("|", " ").replace("--", "").\
                 replace('=', '').replace("- -", "").\
-                replace("#", "").replace("*", "")
+                replace("#", "").replace("*", ""))
     
     def predict(self, doc: Document | list[Document]) -> list[LanguageInfo] | list[list[LanguageInfo]]:
         if isinstance(doc, Document):
             doc = [doc]
         
-        results = []
-        for item in doc:
-            langs, scores = self.model.predict(self.clean_text(item.text), k=self.n_predictions)
-
-            predictions = [
+        languages, scores = self.model.predict([self.clean_text(item.text) for item in doc], k = self.n_predictions)
+        predictions = [
+            [
                 {
                     "name": lang.split("__")[2],
                     "script": lang.split("__")[2].split("_")[1],
-                    "probability": score.item()}
-                for lang, score in zip(langs, scores)
-            ]
-            sorted_predictions = sorted(predictions, key=lambda item: item["probability"], reverse=True)
-            results.append(sorted_predictions)
+                    "probability": score.item()
+                }  for lang, score in zip(language_list, score_list)
+            ] for language_list, score_list in zip(languages, scores)
+        ]
         
-        return results[0] if isinstance(doc, Document) else results
+        return predictions[0] if len(predictions) == 1 else predictions

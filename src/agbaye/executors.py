@@ -27,6 +27,8 @@ def get_common_crawl_executor(
     dump_name: str,
     output_path: str,
     skip_warc_rows: int = 0,
+    limit: int = -1,
+    shuffle: bool = False,
     randomize_start_duration: int = 0,
     logging_dir: str | None = None,
     language_threshold: float = 0.65,
@@ -45,7 +47,8 @@ def get_common_crawl_executor(
                 glob_pattern="*/warc/*",
                 default_metadata={"dump_name": dump_name},
                 skip=skip_warc_rows,
-                shuffle_files=True
+                shuffle_files=shuffle,
+                limit=limit
             ),
             URLFilter(),
             Trafilatura(favour_precision=True, timeout=3.0),

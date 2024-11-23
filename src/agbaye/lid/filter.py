@@ -4,7 +4,6 @@ from datatrove.data import Document
 from datatrove.pipeline.filters.base_filter import BaseFilter
 from datatrove.utils.lid import LID
 from datatrove.pipeline.writers.disk_base import DiskWriter
-from loguru import logger
 
 from .openlid import OpenLID
 from .ubc_afrolid import AfroLID, TorchDevice
@@ -32,7 +31,7 @@ class AfricanLanguageFilter(BaseFilter):
 
         if isinstance(languages, str):
             languages = [languages]
-        
+
         self.languages = set(languages) if languages else languages
         self.model = self.backend_map[backend](n_predictions=5, device=device)
 
@@ -48,19 +47,18 @@ class AfricanLanguageFilter(BaseFilter):
             is_filter
         """
         predictions = self.model.predict(doc)[0]
-        
+
         if predictions[0]["probability"] < self.language_threshold \
             or (self.languages and predictions[0]["name"] not in self.languages):
                 return False
-            
+
         doc.metadata["language"] = predictions[0]["name"]
         doc.metadata["language_script"] = predictions[0]["script"]
         doc.metadata["language_score"] = predictions[0]["probability"]
 
         if self.keep_top_predictions_threshold != -1:
             doc.metadata["top_language_pairs"] = [l for l in predictions if l["probability"] > self.keep_top_predictions_threshold]
-        
-        logger.debug(f"Yielding document. Document: \n{doc.text}\n\nLanguage: {doc.metadata['language']} Probability: {doc.metadata['language_score']}")
+
         return True
 
     def filter_batch(self, batch: list[Document]) -> list[bool]:
@@ -76,8 +74,6 @@ class AfricanLanguageFilter(BaseFilter):
             batch[idx].metadata["language"] = item[0]["name"]
             batch[idx].metadata["language_script"] = item[0]["script"]
             batch[idx].metadata["language_score"] = item[0]["probability"]
-
-            logger.debug(f"Yielding document. Document: \n{batch[idx].text}\n\nLanguage: {batch[idx].metadata['language']} Probability: {batch[idx].metadata['language_score']}")
 
             if self.keep_top_predictions_threshold != -1:
                 batch[idx].metadata["top_language_pairs"] = [l for l in item if l["probability"] > self.keep_top_predictions_threshold]

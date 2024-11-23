@@ -10,6 +10,8 @@ class MainArgs:
     dump_name: str
     output_path: str
     skip_warc_rows: int = 0
+    limit: int = -1
+    shuffle: bool = False
     logging_dir: Optional[str] = None
     executor_class: Literal["local", "slurm"] = "local"
     randomize_start_duration: int = 180
