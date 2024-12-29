@@ -10,6 +10,7 @@ python = "^3.11"
 datatrove = {extras = ["cli", "io", "processing", "s3"], version = "^0.3.0"}
 adlfs = "^2024.7.0"
 python-dotenv = "^1.0.1"
+cleantext = "^1.1.4"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"
@@ -17,6 +18,23 @@ ipykernel = "^6.29.5"
 [tool.poetry.group.afrolid.dependencies]
 afrolid = {git = "https://github.com/theyorubayesian/afrolid.git"}
 sentencepiece = "^0.2.0"
+
+
+[tool.poetry.group.mediapipe.dependencies]
+mediapipe = "^0.10.20"
+
+
+[tool.poetry.group.geolid.dependencies]
+geolid = "^1.0"
+
+
+[tool.poetry.group.evaluation.dependencies]
+scikit-learn = "^1.6.0"
+pycountry = "^24.6.1"
+
+
+[tool.poetry.group.lid_training.dependencies]
+wandb = "^0.19.1"
 
 [build-system]
 requires = ["poetry-core"]
