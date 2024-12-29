@@ -8,6 +8,9 @@ from datatrove.io import cached_asset_path_or_download, safely_create_file
 from datatrove.utils._import_utils import check_required_dependencies
 from datatrove.utils.lid import LID
 
+from .cleaning_utils import clean_text as _clean_text
+from .cleaning_utils import get_nonprintable_char_handler, Demojizer
+
 LanguageInfo: TypeAlias = dict[str, str | float]
 
 
@@ -84,3 +87,28 @@ class OpenLID(LID):
         ]
         
         return predictions[0] if len(predictions) == 1 else predictions
+
+
+class OpenLIDV2(OpenLID):
+    MODEL_URL = "https://huggingface.co/laurievb/OpenLID-v2/resolve/main/openlid_v2.bin?download=true"
+    MODEL_SUBFOLDER = "openlid_v2"
+
+    LANGUAGES: Final = frozenset([
+        "afr_Latn", "amh_Ethi", "bam_Latn", "bem_Latn", "cjk_Latn",
+        "dik_Latn", "ewe_Latn", "fon_Latn", 'fuv_Latn', "gaz_Latn",
+        "hau_Latn", "ibo_Latn", "kab_Latn", "kik_Latn", "kin_Latn",
+        "kmb_Latn", "knc_Latn", "kon_Latn", "lua_Latn", "luo_Latn",
+        "lug_Latn", "mos_Latn", "nso_Latn", "nya_Latn", "plt_Latn",
+        "run_Latn", "sna_Latn", "som_Latn", "sot_Latn", "ssw_Latn",
+        "swh_Latn", "taq_Latn", "taq_Tfng", "tir_Ethi", "tsn_Latn",
+        "tso_Latn", "twi_Latn", "umb_Latn", "wol_Latn", "xho_Latn",
+        "yor_Latn", "zul_Latn"
+    ])
+
+    def __init__(self, languages = None, n_predictions = -1, **kwargs):
+        super().__init__(languages, n_predictions, **kwargs)
+        self.demojizer = Demojizer()
+        self.npc_handler = get_nonprintable_char_handler()
+
+    def clean_text(self, text: str) -> str:
+        return _clean_text(text, self.demojizer, self.npc_handler)
