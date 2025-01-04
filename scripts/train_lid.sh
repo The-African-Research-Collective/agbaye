@@ -22,6 +22,9 @@ function train(){
 
 function evaluate() {
     python -m agbaye.lid.train_fasttext_model evaluate-model \
-    --model "models/filtered_lid201-african-data-preprocessed-model.bin" \
-    --eval_dataset "data/lid_training_data/lid_eval.tsv"
+    --model_name_or_path "OpenLID" \
+    --eval_dataset "data/lid_training_data/lid_eval.tsv" \
+    --report_to_wandb
 }
+
+evaluate

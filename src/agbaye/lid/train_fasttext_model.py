@@ -1,13 +1,14 @@
 import json
 import multiprocessing
 import os
-from typing import Callable, TextIO
+from typing import Callable, Literal, TextIO
 
 import click
 from datasets import load_dataset
 from fasttext import train_supervised, load_model
 
-from .cleaning_utils import clean_text, Demojizer, get_nonprintable_char_handler
+from .cleaning_utils import clean_text, Demojizer, get_nonprintable_char_handler, reformat_labels
+from .prediction_utils import calculate_lid_metrics
 
 # TODO: @theyorubayesian - Figure out how to filter using glottocode
 FLORES_AFRICAN_LANGUAGES = {
@@ -22,19 +23,6 @@ FLORES_AFRICAN_LANGUAGES = {
     "yor_Latn", "zul_Latn"
 }
 
-MACROLANGUAGE_MAP = {
-  "quy_Latn": "que_Latn", "bos_Latn": "hbs_Latn", "ayr_Latn": "aym_Latn",
-  "knc_Latn": "kau_Latn", "knc_Arab": "kau_Arab", "ckb_Arab": "kur_Arab",
-  "hrv_Latn": "hbs_Latn", "prs_Arab": "fas_Arab", "ydd_Hebr": "yid_Hebr",
-  "khk_Cyrl": "mon_Cyrl", "pes_Arab": "fas_Arab", "ltg_Latn": "lav_Latn",
-  "npi_Deva": "nep_Deva", "fuv_Latn": "ful_Latn", "azj_Latn": "aze_Latn",
-  "kmr_Latn": "kur_Latn", "uzn_Latn": "uzb_Latn", "ory_Orya": "ori_Orya",
-  "plt_Latn": "mlg_Latn", "srp_Cyrl": "hbs_Cyrl", "azb_Arab": "aze_Arab",
-  "pbt_Arab": "pus_Arab", "dik_Latn": "din_Latn", "lvs_Latn": "lav_Latn",
-  "swh_Latn": "swa_Latn", "taq_Latn": "tmh_Latn", "taq_Tfng": "tmh_Tfng",
-  "als_Latn": "sqi_Latn", "twi_Latn": "aka_Latn", "gaz_Latn": "orm_Latn",
-}
-
 WURA_LANGUAGES = {
     "afr_Latn", "amh_Ethi", "arz_Arab", "hau_Latn", "ibo_Latn", "kin_Latn", 
     "mlg_Latn", "nya_Latn", "orm_Latn", "por_Latn", "sna_Latn", "som_Latn",
@@ -45,19 +33,6 @@ WURA_LANGUAGES = {
 @click.group()
 def cli():
     pass
-
-
-def reformat_labels(label: str, label_as_macrolanguage: bool = False) -> None:
-    """
-    See Language Identification: https://fasttext.cc/blog/2017/10/02/blog-post.html
-
-    The OpenLID author additionally label languages at the macrolanguage level:
-        https://laurieburchell.github.io/2024/11/12/OpenLID-v2.html
-    """
-    if label_as_macrolanguage:
-        label = MACROLANGUAGE_MAP.get(label, label)
-
-    return f"__label___{label}"
 
 
 def clean_wura_dataset(
@@ -80,12 +55,6 @@ def clean_wura_dataset(
             label = reformat_labels(language, label_as_macrolanguage)
             text = clean_text(line, demojizer, npc_handler)
             f_out.write(f"{label}\t{text}\n")
-
-
-def print_results(N: int, p: float, r: float) -> None:
-    print("N\t" + str(N))
-    print("P@{}\t{:.3f}".format(1, p))
-    print("R@{}\t{:.3f}".format(1, r))
 
 
 @cli.command()
@@ -196,6 +165,7 @@ def train_model(
     training_args = locals()
     training_args.pop("report_to_wandb")
     training_args.pop("wandb_entity")
+    training_args.pop("wandb_project")
     training_args.pop("threads")
 
     if report_to_wandb:
@@ -229,18 +199,72 @@ def train_model(
     )
 
     if validation_dataset:
-        print_results(*model.test(validation_dataset))
+        val_dataset = [line.split("\t") for line in open(validation_dataset, "r").readlines()]
+        labels = [line[0] for line in val_dataset]
+        texts = [line[1] for line in val_dataset]
+
+        predictions, probabilities = model.predict(texts, k=max(at_k))
+        json.dump(
+            {"predictions": predictions, "probabilities": probabilities},
+            open(os.path.join(model_dir, "validation_predictions.json"), "w"),
+            indent=4
+        )
+
+        metrics = calculate_lid_metrics(labels, predictions, at_k=at_k)
+        json.dump(metrics, open(os.path.join(model_dir, "validation_metrics.json"), "w"), indent=4)
+
+        if report_to_wandb:
+            run.summary.update(metrics)
 
 
 @cli.command()
-@click.option("--model", type=str, help="Path to the model")
-@click.option("--eval_dataset", type=str, help="Path to the evaluation dataset")
+@click.option("--model_name_or_path", type=str, help="Path to the model. Can also be any LID supported by agbaye")
+@click.option("--eval_dataset", type=str, help="Path to the cleaned, formatted evaluation dataset")
+@click.option("--at_k", type=int, default=[1, 3, 5, 10], multiple=True, help="Used for computing Recall@k and Precision@K")
+@click.option("--output_dir", type=str, help="Output directory")
+@click.option("--report_to_wandb", is_flag=True, help="Report results to wandb")
+@click.option("--wandb_entity", type=str, help="Wandb entity")
+@click.option("--wandb_project", type=str, default="LID", help="Wandb project")
 def evaluate_model(
-    model: str,
+    model_name_or_path: str | Literal["OpenLID", "OpenLIDV2"],
     eval_dataset: str,
+    at_k: list[int],
+    output_dir: str,
+    report_to_wandb: bool,
+    wandb_entity: str,
+    wandb_project: str
 ) -> None:
-    model = load_model(model)
-    print_results(*model.test(eval_dataset))
+    if os.path.exists(model_name_or_path):
+        model = load_model(model_name_or_path)
+    elif model_name_or_path in ("OpenLID", "OpenLIDV2"):
+        from agbaye.lid import openlid
+        model_cls = getattr(openlid, model_name_or_path)
+        model = model_cls()
+        model._initialize_model()
+        model = model.model
+    else:
+        raise ValueError("Model path does not exist")
+    
+    eval_ds = [line.split("\t") for line in open(eval_dataset, "r").readlines()]
+    labels = [line[0] for line in eval_ds]
+    texts = [line[1].strip() for line in eval_ds]
+
+    predictions, probabilities = model.predict(texts, k=max(at_k))
+
+    metrics = calculate_lid_metrics(labels, predictions, at_k=at_k)
+    if output_dir:
+        json.dump(
+            {"predictions": predictions, "probabilities": probabilities},
+            open(os.path.join(output_dir, "validation_predictions.json"), "w"),
+            indent=4
+        )
+        json.dump(metrics, open(os.path.join(output_dir, "validation_metrics.json"), "w"), indent=4)
+
+    if report_to_wandb:
+        import wandb
+        run = wandb.init(entity=wandb_entity, project=wandb_project)
+        run.config.update({"model_name_or_path": model_name_or_path, "eval_dataset": eval_dataset, at_k: at_k})
+        run.summary.update(metrics)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,19 @@ from typing import Callable
 import emoji
 from cleantext import clean
 
+MACROLANGUAGE_MAP = {
+  "quy_Latn": "que_Latn", "bos_Latn": "hbs_Latn", "ayr_Latn": "aym_Latn",
+  "knc_Latn": "kau_Latn", "knc_Arab": "kau_Arab", "ckb_Arab": "kur_Arab",
+  "hrv_Latn": "hbs_Latn", "prs_Arab": "fas_Arab", "ydd_Hebr": "yid_Hebr",
+  "khk_Cyrl": "mon_Cyrl", "pes_Arab": "fas_Arab", "ltg_Latn": "lav_Latn",
+  "npi_Deva": "nep_Deva", "fuv_Latn": "ful_Latn", "azj_Latn": "aze_Latn",
+  "kmr_Latn": "kur_Latn", "uzn_Latn": "uzb_Latn", "ory_Orya": "ori_Orya",
+  "plt_Latn": "mlg_Latn", "srp_Cyrl": "hbs_Cyrl", "azb_Arab": "aze_Arab",
+  "pbt_Arab": "pus_Arab", "dik_Latn": "din_Latn", "lvs_Latn": "lav_Latn",
+  "swh_Latn": "swa_Latn", "taq_Latn": "tmh_Latn", "taq_Tfng": "tmh_Tfng",
+  "als_Latn": "sqi_Latn", "twi_Latn": "aka_Latn", "gaz_Latn": "orm_Latn",
+}
+
 
 class Demojizer:
     """
@@ -100,3 +113,16 @@ def clean_text(
     )
 
     return cleaned_text
+
+
+def reformat_labels(label: str, label_as_macrolanguage: bool = False) -> None:
+    """
+    See Language Identification: https://fasttext.cc/blog/2017/10/02/blog-post.html
+
+    The OpenLID author additionally label languages at the macrolanguage level:
+        https://laurieburchell.github.io/2024/11/12/OpenLID-v2.html
+    """
+    if label_as_macrolanguage:
+        label = MACROLANGUAGE_MAP.get(label, label)
+
+    return f"__label___{label}"
