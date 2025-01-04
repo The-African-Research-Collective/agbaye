@@ -1,13 +1,26 @@
-import argparse
+import json
 import multiprocessing
+import os
+from typing import Callable, TextIO
 
+import click
 from datasets import load_dataset
-from fasttext import train_supervised
+from fasttext import train_supervised, load_model
 
 from .cleaning_utils import clean_text, Demojizer, get_nonprintable_char_handler
 
-# TODO: @theyorubayesian - Explore using flores+ as training dataset
-# TODO: Evaldataset is Flores devtest, wura validation set
+# TODO: @theyorubayesian - Figure out how to filter using glottocode
+FLORES_AFRICAN_LANGUAGES = {
+    "afr_Latn", "amh_Ethi", "bam_Latn", "bem_Latn", "cjk_Latn"
+    "dik_Latn", "ewe_Latn", "fon_Latn", "fuv_Latn", "gaz_Latn"
+    "hau_Latn", "ibo_Latn", "kab_Latn", "kik_Latn", "kin_Latn"
+    "kmb_Latn", "knc_Latn", "kon_Latn", "lua_Latn", "luo_Latn"
+    "lug_Latn", "mos_Latn", "nso_Latn", "nya_Latn", "plt_Latn"
+    "run_Latn", "sna_Latn", "som_Latn", "sot_Latn", "ssw_Latn"
+    "swa_Latn", "taq_Latn", "taq_Tfng", "tir_Ethi", "tsn_Latn"
+    "tso_Latn", "twi_Latn", "umb_Latn", "wol_Latn", "xho_Latn"
+    "yor_Latn", "zul_Latn"
+}
 
 MACROLANGUAGE_MAP = {
   "quy_Latn": "que_Latn", "bos_Latn": "hbs_Latn", "ayr_Latn": "aym_Latn",
@@ -20,7 +33,6 @@ MACROLANGUAGE_MAP = {
   "pbt_Arab": "pus_Arab", "dik_Latn": "din_Latn", "lvs_Latn": "lav_Latn",
   "swh_Latn": "swa_Latn", "taq_Latn": "tmh_Latn", "taq_Tfng": "tmh_Tfng",
   "als_Latn": "sqi_Latn", "twi_Latn": "aka_Latn", "gaz_Latn": "orm_Latn",
-  "yue_Hant": "zho_Hant"
 }
 
 WURA_LANGUAGES = {
@@ -30,34 +42,9 @@ WURA_LANGUAGES = {
 }
 
 
-def get_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--trainDataset", type=str, help="Path to the training data")
-    parser.add_argument("--includeWura", action="store_true", help="Include wura as training dataset")
-    parser.add_argument("--validationDataset", type=str, help="Path to the validation data")
-    parser.add_argument("--command", choices=["preprocess_dataset", "train_model"], default="train_model", help="Operation to perform")
-    parser.add_argument("--model", choices=["cbow", "skipgram"], default="skipgram", help="Model architecture")
-    parser.add_argument("--macrolanguage", action="store_true", help="If true, label relevant languages at macrolanguage leevel")
-    parser.add_argument("--output", type=str, help="Path to the output model")
-    parser.add_argument("--label", type=str, default="__label__", help="Prefix label")
-    parser.add_argument("--epoch", type=int, default=5, help="Number of epochs")
-    parser.add_argument("--lr", type=float, default=0.1, help="Learning rate")
-    parser.add_argument("--lrUpdateRate", type=int, default=100, help="Rate of updates for the learning rate")
-    parser.add_argument("--loss", type=str, default="ns", choices=["ns", "hs", "softmax"], help="Loss function {ns, hs, softmax}")
-    parser.add_argument("--neg", type=int, default=5, help="Number of negatives sampled")
-    parser.add_argument("--wordNgrams", type=int, default=2, help="Number of word n-grams")
-    parser.add_argument("--minCount", type=int, default=5, help="Minimal number of word occurences")
-    parser.add_argument("--minn", type=int, default=3, help="Min length of char n-grams")
-    parser.add_argument("--maxn", type=int, default=6, help="Max length of char n-grams")
-    parser.add_argument("--bucket", type=int, default=2000000, help="Number of buckets used in hashing function of n-grams")
-    parser.add_argument("--dim", type=int, default=256, help="Size of word vectors")
-    parser.add_argument("--ws", type=str, default="5", help="Size of the context window")
-    parser.add_argument("--pretrainedVectors", type=str, help="pretrained word vectors for supervised learning")
-    parser.add_argument("--threshold", type=float, default=0.0001, help="Threshold for subsampling frequent words")
-    parser.add_argument("--seed", type=int, default=42, help="Seed for the random number generator")
-    parser.add_argument("--thread", type=int, default=multiprocessing.cpu_count() - 1, help="Number of threads")
-    args = parser.parse_args()
-    return args
+@click.group()
+def cli():
+    pass
 
 
 def reformat_labels(label: str, label_as_macrolanguage: bool = False) -> None:
@@ -73,6 +60,40 @@ def reformat_labels(label: str, label_as_macrolanguage: bool = False) -> None:
     return f"__label___{label}"
 
 
+def clean_wura_dataset(
+    split: str,
+    f_out: TextIO,
+    npc_handler: Callable = None,
+    demojizer: Callable = None,
+    label_as_macrolanguage: bool = False,
+) -> None:
+    for language in WURA_LANGUAGES:
+        wura_dataset = load_dataset(
+            "castorini/wura",
+            language.split("_")[0],
+            level="passage",
+            split=split,
+            verification_mode="no_checks"
+        )
+
+        for line in wura_dataset["text"]:
+            label = reformat_labels(language, label_as_macrolanguage)
+            text = clean_text(line, demojizer, npc_handler)
+            f_out.write(f"{label}\t{text}\n")
+
+
+def print_results(N: int, p: float, r: float) -> None:
+    print("N\t" + str(N))
+    print("P@{}\t{:.3f}".format(1, p))
+    print("R@{}\t{:.3f}".format(1, r))
+
+
+@cli.command()
+@click.option("--input_dataset", type=str, help="Path to the input dataset")
+@click.option("--output_dataset", type=str, help="Path to the output dataset")
+@click.option("--label_as_macrolanguage", type=bool, default=False, help="If true, label relevant languages at macrolanguage level")
+@click.option("--include_wura", type=bool, default=False, help="If true, include wura dataset")
+@click.option("--wura_split", type=str, default="train", help="Wura split to include")
 def clean_dataset(
     input_dataset: str,
     output_dataset: str,
@@ -83,7 +104,7 @@ def clean_dataset(
     npc_handler = get_nonprintable_char_handler()
     demojizer =  Demojizer()
 
-    with open(input_dataset, "r") as f_in, open(output_dataset, "w") as f_out:
+    with open(input_dataset, "r") as f_in, open(output_dataset, "a") as f_out:
         for line in f_in:
             text, label, _ = line.split("\t")
             label = reformat_labels(label, label_as_macrolanguage)
@@ -93,63 +114,134 @@ def clean_dataset(
         f_in.close()
 
         if include_wura:
-            for language in WURA_LANGUAGES:
-                wura_dataset = load_dataset(
-                    "wura",
-                    language.split("_")[0],
-                    level="passages",
-                    split=wura_split,
-                    verification_mode="no_checks"
-                )
-
-                for line in wura_dataset["text"]:
-                    label = reformat_labels(language, label_as_macrolanguage)
-                    text = clean_text(line, demojizer, npc_handler)
-                    f_out.write(f"{label}\t{line}\n")
+            clean_wura_dataset(
+                wura_split, f_out, npc_handler, demojizer, label_as_macrolanguage
+            )
 
 
-def print_results(N: int, p: float, r: float) -> None:
-    print("N\t" + str(N))
-    print("P@{}\t{:.3f}".format(1, p))
-    print("R@{}\t{:.3f}".format(1, r))
+@cli.command()
+@click.option("--data_dir", type=str, help="Eval dataset will be saved to output_dir/lid_eval.tsv")
+@click.option("--include_wura", type=bool, default=False, help="If true, include wura dataset")
+@click.option("--label_as_macrolanguage", type=bool, default=False, help="If true, label relevant languages at macrolanguage level")
+def get_eval_dataset(
+    data_dir: str, 
+    include_wura: bool = False,
+    label_as_macrolanguage: bool = False
+) -> None:
+    npc_handler = get_nonprintable_char_handler()
+    demojizer =  Demojizer()
+
+    with open(os.path.join(data_dir, "lid_eval.tsv"), "w") as f_out:
+        for language in FLORES_AFRICAN_LANGUAGES:
+            ds = load_dataset("openlanguagedata/flores_plus", split="devtest")
+            for iso_639_3, iso_15924, text in zip(ds["iso_639_3"], ds["iso_15924"], ds["text"]):
+                if f"{iso_639_3}_{iso_15924}" in FLORES_AFRICAN_LANGUAGES:
+                    label = reformat_labels(f"{iso_639_3}_{iso_15924}", label_as_macrolanguage)
+                    text = clean_text(text, demojizer, npc_handler)
+                    f_out.write(f"{label}\t{text}\n")
+
+        if include_wura:
+            clean_wura_dataset(
+                "validation", f_out, npc_handler, demojizer, label_as_macrolanguage
+            )
 
 
-def train_model(args: argparse.Namespace) -> None:
+@cli.command()
+@click.option("--train_dataset", type=str, help="Path to the training data")
+@click.option("--validation_dataset", type=str, help="Path to the validation data")
+@click.option("--model_dir", type=str, help="Model output directory")
+@click.option("--epoch", type=int, default=5, help="Number of epochs")
+@click.option("--lr", type=float, default=0.1, help="Learning rate")
+@click.option("--lrupdaterate", type=int, default=100, help="Rate of updates for the learning rate")
+@click.option("--loss", type=str, default="ns", help="Loss function {ns, hs, softmax}")
+@click.option("--neg", type=int, default=5, help="Number of negatives sampled")
+@click.option("--wordngrams", type=int, default=2, help="Number of word n-grams")
+@click.option("--mincount", type=int, default=5, help="Minimal number of word occurences")
+@click.option("--minn", type=int, default=3, help="Min length of char n-grams")
+@click.option("--maxn", type=int, default=6, help="Max length of char n-grams")
+@click.option("--bucket", type=int, default=2_000_000, help="Number of buckets used in hashing function of n-grams")
+@click.option("--dim", type=int, default=256, help="Size of word vectors")
+@click.option("--ws", type=int, default=5, help="Size of the context window")
+@click.option("--threshold", type=float, default=0.0001, help="Threshold for subsampling frequent words")
+@click.option("--seed", type=int, default=42, help="Seed for the random number generator")
+@click.option("--at_k", type=int, default=[1], multiple=True, help="Used for computing Recall@k and Precision@K")
+@click.option("--threads", type=int, default=multiprocessing.cpu_count() - 1, help="Number of threads")
+@click.option("--report_to_wandb", is_flag=True, help="Report results to wandb")
+@click.option("--wandb_entity", type=str, help="Wandb entity")
+@click.option("--wandb_project", type=str, default="LID", help="Wandb project")
+def train_model(
+    train_dataset: str,
+    validation_dataset: str,
+    model_dir: str,
+    epoch: int,
+    lr: float,
+    lrupdaterate: int,
+    loss: str,
+    neg: int,
+    wordngrams: int,
+    mincount: int,
+    minn: int,
+    maxn: int,
+    bucket: int,
+    dim: int,
+    ws: int,
+    threshold: float,
+    at_k: list[int],
+    seed: int,
+    threads: int,
+    report_to_wandb: bool,
+    wandb_entity: str,
+    wandb_project: str 
+) -> None:
+    training_args = locals()
+    training_args.pop("report_to_wandb")
+    training_args.pop("wandb_entity")
+    training_args.pop("threads")
+
+    if report_to_wandb:
+        import wandb
+
+        run = wandb.init(entity=wandb_entity, project=wandb_project)
+        run.config.update(training_args)
+
     model = train_supervised(
-        input=args.trainDataset,
-        epoch=args.epoch,
-        lr=args.lr,
-        lrUpdateRate=args.lrUpdateRate,
-        loss=args.loss,
-        neg=args.neg,
-        ws=args.ws,
-        dim=args.dim,
-        wordNgrams=args.wordNgrams,
-        minCount=args.minCount,
-        minn=args.minn,
-        maxn=args.maxn,
-        bucket=args.bucket,
-        t=args.threshold,
-        thread=args.thread,
+        input=train_dataset,
+        epoch=epoch,
+        lr=lr,
+        lrUpdateRate=lrupdaterate,
+        loss=loss,
+        neg=neg,
+        ws=ws,
+        dim=dim,
+        wordNgrams=wordngrams,
+        minCount=mincount,
+        minn=minn,
+        maxn=maxn,
+        bucket=bucket,
+        t=threshold,
+        thread=threads,
+        seed=seed
     )
 
-    if args.validationDataset:
-        print_results(*model.test(args.validationDataset))
-    
-    model.save_model(args.output)
+    model.save_model(os.path.join(model_dir, "lid_model.bin"))
+    json.dump(
+        training_args, open(os.path.join(model_dir, "training_args.json"), "w"), indent=4
+    )
+
+    if validation_dataset:
+        print_results(*model.test(validation_dataset))
+
+
+@cli.command()
+@click.option("--model", type=str, help="Path to the model")
+@click.option("--eval_dataset", type=str, help="Path to the evaluation dataset")
+def evaluate_model(
+    model: str,
+    eval_dataset: str,
+) -> None:
+    model = load_model(model)
+    print_results(*model.test(eval_dataset))
 
 
 if __name__ == "__main__":
-    # Mikolov et al. (2013b) note that the most important parameters are:
-    # threshold, dim, ws, and the architecture of the model
-    # The params affecting architecture are:
-    # - loss, neg, model
-    # Mikolov et al. () use 10M bins/buckets when using bigrams, and 100M bins otherwise
-    # Research question: 
-    args = get_args()
-
-    if args.command == "train_model":
-        train_model(args)
-
-    elif args.command == "preprocess_dataset":
-        clean_dataset(args.trainDataset, args.output, args.macrolanguage)
+    cli()
