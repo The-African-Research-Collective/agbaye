@@ -226,7 +226,7 @@ def train_model(
 @click.option("--wandb_entity", type=str, help="Wandb entity")
 @click.option("--wandb_project", type=str, default="LID", help="Wandb project")
 def evaluate_model(
-    model_name_or_path: str | Literal["OpenLID", "OpenLIDV2"],
+    model_name_or_path: str | Literal["OpenLID", "OpenLIDV2", "FT176LID", "GlotLID"],
     eval_dataset: str,
     at_k: list[int],
     output_dir: str,
