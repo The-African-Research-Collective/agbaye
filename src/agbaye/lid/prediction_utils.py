@@ -1,3 +1,4 @@
+from functools import lru_cache
 from statistics import mean
 
 import pycountry
@@ -15,10 +16,10 @@ def get_language_from_code(code: str) -> str:
     return language_tuple.name
 
 
+@lru_cache
 def normalize_language(label: str) -> str:
-    if '__label__' in label:
-        # OpenLID always returns labels of the form __label__language
-        label = label.replace("__label___", "")
+    # OpenLID uses labels of the form __label__language while OpenLIDV2 uses __label___language
+    label = label.replace("__label___", "").replace("__label___", "")
 
     # GeoLID returns labels of the form language_Script
     try:

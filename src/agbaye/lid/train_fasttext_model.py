@@ -8,7 +8,7 @@ from datasets import load_dataset
 from fasttext import train_supervised, load_model
 
 from .cleaning_utils import clean_text, Demojizer, get_nonprintable_char_handler, reformat_labels
-from .prediction_utils import calculate_lid_metrics
+from .prediction_utils import calculate_lid_metrics, normalize_language
 
 # TODO: @theyorubayesian - Figure out how to filter using glottocode
 FLORES_AFRICAN_LANGUAGES = {
@@ -242,6 +242,9 @@ def evaluate_model(
         model = model_cls()
         model._initialize_model()
         model = model.model
+    elif model_name_or_path in ("FT176LID", "GlotLID"):
+        from datatrove.pipeline.filters.language_filter import LanguageFilter
+        model = LanguageFilter(backend=model_name_or_path).model.model
     else:
         raise ValueError("Model path does not exist")
     
@@ -250,6 +253,14 @@ def evaluate_model(
     texts = [line[1].strip() for line in eval_ds]
 
     predictions, probabilities = model.predict(texts, k=max(at_k))
+
+    # OpenLID uses labels of the form __label__language while OpenLIDV2 uses __label___language
+    if predictions[0][0].startswith("__label___"):
+        if not labels[0].startswith("__label___"):
+            labels = [f"__label___{'_'.join(label.split('_')[-2:])}" for label in labels]
+    elif predictions[0][0].startswith("__label__"):
+        if labels[0].startswith("__label___"):
+            labels = [f"__label__{'_'.join(label.split('_')[-2:])}" for label in labels]
 
     metrics = calculate_lid_metrics(labels, predictions, at_k=at_k)
     if output_dir:
@@ -263,7 +274,7 @@ def evaluate_model(
     if report_to_wandb:
         import wandb
         run = wandb.init(entity=wandb_entity, project=wandb_project)
-        run.config.update({"model_name_or_path": model_name_or_path, "eval_dataset": eval_dataset, at_k: at_k})
+        run.config.update({"model_name_or_path": model_name_or_path, "eval_dataset": eval_dataset, "at_k": at_k})
         run.summary.update(metrics)
 
 
