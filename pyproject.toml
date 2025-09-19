@@ -1,44 +1,44 @@
-[tool.poetry]
+[project]
 name = "agbaye"
 version = "0.1.0"
 description = "Preprocessing Common Crawl for African Text"
-authors = ["theyorubayesian <akin.o.oladipo@gmail.com>"]
 readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Akintunde 'theyorubayesian' Oladipo", email = "akintunde.oladipo@taresco.org" },
+]
+dependencies = [
+    "cleantext>=1.1.4",
+    "datatrove[cli,io,processing,s3]>=0.6.0",
+    "emoji>=2.14.1",
+    "pycountry>=24.6.1",
+    "python-dotenv>=1.1.1",
+    "typer>=0.17.4",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-datatrove = {extras = ["cli", "io", "processing", "s3"], version = "^0.3.0"}
-adlfs = "^2024.7.0"
-python-dotenv = "^1.0.1"
-cleantext = "^1.1.4"
+[project.optional-dependencies]
+azure = [
+    "adlfs>=2025.8.0",
+]
+lid-training = [
+    "scikit-learn>=1.7.2",
+    "wandb>=0.22.0",
+]
+mediapipe = [
+    "mediapipe>=0.10.14",
+]
+afrolid = [
+    "sentencepiece>=0.2.1",
+]
 
-[tool.poetry.group.dev.dependencies]
-ipykernel = "^6.29.5"
+[dependency-groups]
+dev = [
+    "ipykernel>=6.30.1",
+]
 
-[tool.poetry.group.afrolid.dependencies]
-afrolid = {git = "https://github.com/theyorubayesian/afrolid.git"}
-sentencepiece = "^0.2.0"
-
-
-[tool.poetry.group.mediapipe.dependencies]
-mediapipe = "^0.10.20"
-
-
-[tool.poetry.group.geolid.dependencies]
-geolid = "^1.0"
-
-
-[tool.poetry.group.evaluation.dependencies]
-scikit-learn = "^1.6.0"
-pycountry = "^24.6.1"
-
-
-[tool.poetry.group.lid_training.dependencies]
-wandb = "^0.19.1"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.scripts]
+[project.scripts]
 agbaye = "agbaye.__main__:main"
+
+[tool.uv]
+package = true
+default-groups = ["dev"]
