@@ -43,10 +43,19 @@ wheels = [
 ]
 
 [[package]]
+name = "africanlanguages"
+version = "0.1.0"
+source = { git = "https://github.com/The-African-Research-Collective/africanlanguages.git#ed87bd638e59bff2645b5fe93eb7e8563eeca7f4" }
+dependencies = [
+    { name = "pycountry" },
+]
+
+[[package]]
 name = "agbaye"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "africanlanguages" },
     { name = "cleantext" },
     { name = "datatrove", extra = ["cli", "io", "processing", "s3"] },
     { name = "emoji" },
@@ -78,6 +87,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "adlfs", marker = "extra == 'azure'", specifier = ">=2025.8.0" },
+    { name = "africanlanguages", git = "https://github.com/The-African-Research-Collective/africanlanguages.git" },
     { name = "cleantext", specifier = ">=1.1.4" },
     { name = "datatrove", extras = ["cli", "io", "processing", "s3"], specifier = ">=0.6.0" },
     { name = "emoji", specifier = ">=2.14.1" },

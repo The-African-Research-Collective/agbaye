@@ -8,6 +8,7 @@ authors = [
     { name = "Akintunde 'theyorubayesian' Oladipo", email = "akintunde.oladipo@taresco.org" },
 ]
 dependencies = [
+    "africanlanguages",
     "cleantext>=1.1.4",
     "datatrove[cli,io,processing,s3]>=0.6.0",
     "emoji>=2.14.1",
@@ -42,3 +43,6 @@ agbaye = "agbaye.__main__:main"
 [tool.uv]
 package = true
 default-groups = ["dev"]
+
+[tool.uv.sources]
+africanlanguages = { git = "https://github.com/The-African-Research-Collective/africanlanguages.git" }
