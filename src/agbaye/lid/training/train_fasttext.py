@@ -1,5 +1,7 @@
 import json
+import logging
 import os
+from pathlib import Path
 from typing import Annotated, Final
 
 from fasttext import train_supervised, load_model
@@ -11,12 +13,36 @@ app = Typer(no_args_is_help=True)
 
 KNOWN_LID_MODELS: Final[list[str]] = {"OpenLID", "OpenLIDV2", "FT176LID", "GlotLID"}
 
+logger = logging.getLogger(__name__)
+
+
+def sanitize_labels(
+    predictions: list[list[str]], labels: list[list[str]]
+) -> list[list[str]]:
+    # OpenLID uses labels of the form __label__language while OpenLIDV2 uses __label___language
+    if predictions[0][0].startswith("__label___"):
+        if not labels[0].startswith("__label___"):
+            labels = [
+                f"__label___{'_'.join(label.split('_')[-2:])}" for label in labels
+            ]
+    elif predictions[0][0].startswith("__label__"):
+        if labels[0].startswith("__label___"):
+            labels = [f"__label__{'_'.join(label.split('_')[-2:])}" for label in labels]
+
+    return labels
+
 
 @app.command()
 def train_model(
-    train_dataset: Annotated[str, Option(help="Dataset for model training")],
     output_dir: Annotated[str, Option(help="Output directory for experiment")],
-    validation_dataset: Annotated[str | None, Option(help="Dataset for model validation")] = None,
+    train_dataset: Annotated[str, Option(help="Dataset for model training")],
+    validation_dataset_or_dir: Annotated[
+        str | None,
+        Option(
+            help="Validation dataset or directory containing validation datasets. "
+            "If a dir is passed, the language is inferred from the file name and is used a metric prefix and label"
+        ),
+    ] = None,
     epoch: Annotated[
         int, Option(help="Number of training epochs", rich_help_panel="Training Args")
     ] = 5,
@@ -113,7 +139,6 @@ def train_model(
     training_args.pop("report_to_wandb")
     training_args.pop("wandb_entity")
     training_args.pop("wandb_project")
-    training_args.pop("threads")
 
     run = None
     if report_to_wandb:
@@ -141,36 +166,83 @@ def train_model(
         seed=seed,
     )
 
-    model.save_model(os.path.join(output_dir, "lid_model.bin"))
+    model_path = os.path.join(output_dir, "lid_model.bin")
+    model.save_model(model_path)
     json.dump(
         training_args,
         open(os.path.join(output_dir, "training_args.json"), "w"),
         indent=4,
     )
 
-    if validation_dataset:
-        val_dataset = [
-            line.split("\t") for line in open(validation_dataset, "r").readlines()
-        ]
-        labels = [line[0] for line in val_dataset]
-        texts = [line[1] for line in val_dataset]
+    if validation_dataset_or_dir:
+        validation_dataset_or_dir: Path = Path(validation_dataset_or_dir)
 
-        predictions, probabilities = model.predict(texts, k=max(at_k))
-        json.dump(
-            {"predictions": predictions, "probabilities": probabilities},
-            open(os.path.join(output_dir, "validation_predictions.json"), "w"),
-            indent=4,
-        )
+        if validation_dataset_or_dir.is_file():
+            _, _, metrics = evaluate_model(
+                model_name_or_path=model_path,
+                eval_dataset=validation_dataset_or_dir,
+                at_k=at_k,
+            )
 
-        metrics = calculate_lid_metrics(labels, predictions, at_k=at_k)
-        json.dump(
-            metrics,
-            open(os.path.join(output_dir, "validation_metrics.json"), "w"),
-            indent=4,
-        )
+            json.dump(
+                metrics,
+                open(os.path.join(output_dir, "validation_metrics.json"), "w"),
+                indent=4,
+            )
+
+            if report_to_wandb:
+                run.summary.update(metrics)
+
+        elif validation_dataset_or_dir.is_dir():
+            all_predictions = []
+            all_labels = []
+            all_metrics = {"overall": {}, "per_language": {}}
+
+            for validation_dataset in validation_dataset_or_dir.glob("*"):
+                try:
+                    language = validation_dataset.stem
+                    predictions, _, metrics = evaluate_model(
+                        model_name_or_path=model_path,
+                        eval_dataset=validation_dataset.as_posix(),
+                        at_k=at_k,
+                    )
+
+                    all_predictions += predictions
+                    all_labels += sanitize_labels(
+                        predictions, [f"__label__{language}"] * len(predictions)
+                    )
+
+                    metrics = {f"{language}/{k}": v for k, v in metrics.items()}
+                    all_metrics["per_language"][language] = metrics
+                except:  # noqa: E722
+                    logger.warning(f"Error calculating validation metrics for {validation_dataset.as_posix()}")
+
+            overall_metrics = {
+                f"eval/{k}": v
+                for k, v in calculate_lid_metrics(
+                    all_labels, all_predictions, at_k=at_k
+                ).items()
+            }
+            all_metrics["overall"].update(overall_metrics)
+
+            json.dump(
+                all_metrics,
+                open(os.path.join(output_dir, "validation_metrics.json"), "w"),
+                indent=4,
+            )
+
+            if report_to_wandb:
+                metrics_dict = {
+                    k: v
+                    for split in all_metrics["per_language"].values()
+                    for k, v in split.items()
+                }
+                metrics_dict.update(all_metrics["overall"])
+            
+                run.summary.update(metrics_dict)
 
         if report_to_wandb:
-            run.summary.update(metrics)
+            run.finish()
 
 
 @app.command()
@@ -183,7 +255,6 @@ def evaluate_model(
         ),
     ],
     eval_dataset: Annotated[str, Option(help="Dataset for model validation")],
-    output_dir: Annotated[str, Option(help="Output directory for experiment")],
     at_k: Annotated[
         list[int],
         Option(
@@ -192,6 +263,9 @@ def evaluate_model(
             rich_help_panel="Evaluation Args",
         ),
     ],
+    output_dir: Annotated[
+        str | None, Option(help="Output directory for experiment")
+    ] = None,
     report_to_wandb: Annotated[
         bool,
         Option(
@@ -213,7 +287,7 @@ def evaluate_model(
             rich_help_panel="Experiment Tracking",
         ),
     ] = None,
-) -> None:
+) -> tuple[list[list[str]], list[list[float]], dict[str, float]]:
     if os.path.exists(model_name_or_path):
         model = load_model(model_name_or_path)
     elif model_name_or_path in ("OpenLID", "OpenLIDV2"):
@@ -235,18 +309,11 @@ def evaluate_model(
     texts = [line[1].strip() for line in eval_ds]
 
     predictions, probabilities = model.predict(texts, k=max(at_k))
-
-    # OpenLID uses labels of the form __label__language while OpenLIDV2 uses __label___language
-    if predictions[0][0].startswith("__label___"):
-        if not labels[0].startswith("__label___"):
-            labels = [
-                f"__label___{'_'.join(label.split('_')[-2:])}" for label in labels
-            ]
-    elif predictions[0][0].startswith("__label__"):
-        if labels[0].startswith("__label___"):
-            labels = [f"__label__{'_'.join(label.split('_')[-2:])}" for label in labels]
+    probabilities = [probs.tolist() for probs in probabilities]
+    labels = sanitize_labels(predictions, labels)
 
     metrics = calculate_lid_metrics(labels, predictions, at_k=at_k)
+
     if output_dir:
         json.dump(
             {"predictions": predictions, "probabilities": probabilities},
@@ -271,6 +338,8 @@ def evaluate_model(
             }
         )
         run.summary.update(metrics)
+
+    return predictions, probabilities, metrics
 
 
 if __name__ == "__main__":
