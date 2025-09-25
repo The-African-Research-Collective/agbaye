@@ -3,7 +3,7 @@ from typing import Annotated, Callable, TextIO
 
 from africanlanguages import AfricanLanguages
 from datasets import get_dataset_config_names, load_dataset
-from typer import Argument, Option, Typer
+from typer import Option, Typer
 
 from agbaye.lid.cleaning_utils import (
     clean_text,
