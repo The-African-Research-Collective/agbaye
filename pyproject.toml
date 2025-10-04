@@ -23,6 +23,8 @@ azure = [
 ]
 lid-training = [
     "scikit-learn>=1.7.2",
+    "sentencepiece>=0.2.1",
+    "transformers>=4.57.0",
     "wandb>=0.22.0",
 ]
 mediapipe = [
